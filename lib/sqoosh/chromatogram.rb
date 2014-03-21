@@ -1,5 +1,11 @@
+require 'sqoosh/creates_chromatograms'
+
 module Sqoosh
   class Chromatogram
+    class << self
+      include CreatesChromatograms
+    end
+
     # note that this may be shared with other chromatograms
     attr_accessor :retention_times
     attr_accessor :intensities

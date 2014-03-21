@@ -19,6 +19,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   [
+    ["andand", "~> 1.3.3"],
     ["binneroc", "~> 0.0.2"],
   ].each do |args|
     spec.add_dependency(*args)
