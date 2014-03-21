@@ -19,6 +19,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   [
+    ["mspire", "~> 0.10.7.1"],
     ["andand", "~> 1.3.3"],
     ["binneroc", "~> 0.0.2"],
   ].each do |args|
@@ -27,6 +28,7 @@ Gem::Specification.new do |spec|
 
   [
     ["bundler", "~> 1.5.3"],
+    ["gnuplot"],
     ["rake"],
     ["rspec", "~> 2.14.1"], 
     ["rdoc", "~> 4.1.0"], 
