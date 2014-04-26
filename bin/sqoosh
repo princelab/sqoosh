@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+
+require 'sqoosh/chromatogram'
+require 'savgol'
+require 'optparse'
+require 'ostruct'
+require 'gnuplot'
+
+def putsv(*args)
+  puts *args if $VERBOSE
+end
+
+CACHE_EXT = ".sqoosh_chrom.cache"
+opt = OpenStruct.new({
+  mz_bin: 0.1,
+  sg_window_points: 21,
+  sg_order: 2,
+  rt_bin: 2,
+  rt_view_start: nil,
+  rt_view_end: nil,
+})
+
+parser = OptionParser.new do |op|
+  op.banner = "usage: #{File.basename(__FILE__)} <file>.mzML ..."
+  op.on("-i", "--mz-bin <Float>", Float, "mz bin width") {|v| opt.mz_bin = v }
+  op.on("-r", "--rt-bin <Float>", Float, "retention time width (sec)") {|v| opt.rt_bin = v }
+  op.on("-p", "--sg-window-points <Int>", Integer, "number of savgol smoothing points (def: #{opt.sg_window_points})") {|v| opt.sg_window_points = v }
+  op.on("--rt-view-start <Float>", Float, "view RT window start") {|v| opt.rt_view_start = v }
+  op.on("--rt-view-end <Float>", Float, "view RT window end") {|v| opt.rt_view_end = v }
+  op.on("-o", "--sg-order <Int>", Integer, "savgol polynomial order (def: #{opt.sg_order})") {|v| opt.sg_order = v }
+  op.on("--plot-chromatograms <0,1,...>", "comma separated list of chromatograms to plot") {|v| opt.plot_chromatograms = v.split(',').map(&:to_i) }
+  op.on("--cache", "writes (or uses) <file>.#{CACHE_EXT}") {|v| opt.cache = v }
+end
+parser.parse!
+
+if ARGV.size == 0
+  puts parser
+  exit
+end
+
+ARGV.each do |file|
+  base = file.chomp(File.extname(file))
+
+  chromatograms = 
+    if opt.cache 
+      cache_file = base + CACHE_EXT
+      if File.exist?(cache_file)
+        Marshal.load(IO.read(cache_file))
+      else
+        chromatograms = Sqoosh::Chromatogram.create_chromatograms(file, increment: opt.mz_bin)
+        File.write(cache_file, Marshal.dump(chromatograms))
+        chromatograms
+      end
+    end
+  putsv "#{chromatograms.size} chromatograms"
+
+  last_time = chromatograms.first.retention_times.last
+  rnd_last_time = last_time.ceil
+
+  opt.rt_view_start ||= 0
+  opt.rt_view_end ||= chromatogram.retention_times.last + 1
+  new_time_vals = (opt.rt_view_start..opt.rt_view_end).step(opt.rt_bin).to_a
+
+  if opt.plot_chromatograms 
+    p opt.plot_chromatograms 
+    chromatograms = chromatograms.values_at(*opt.plot_chromatograms)
+  end
+
+  chromatograms.each_with_index do |chromatogram,i|
+    if opt.rt_view_start || opt.rt_view_end
+      num_points_before = chromatogram.retention_times.size
+      range = opt.rt_view_start..opt.rt_view_end
+      new_rts = []
+      new_ints = []
+      chromatogram.retention_times.zip(chromatogram.intensities) do |rt,int|
+        if range === rt
+          new_rts << rt
+          new_ints << int
+        end
+      end
+      chromatogram.retention_times = new_rts
+      chromatogram.intensities = new_ints
+      putsv "Chrom points: #{num_points_before} to #{chromatogram.retention_times.size}"
+    end
+
+    chrom_index = opt.plot_chromatograms[i]
+
+    smoothed_intensities = Savgol.savgol_uneven(
+      chromatogram.retention_times, 
+      chromatogram.intensities, 
+      opt.sg_window_points,
+      opt.sg_order,
+      new_xvals: new_time_vals,
+    )
+
+    if true
+      Gnuplot.open do |gp|
+        Gnuplot::Plot.new(gp) do |plot|
+
+          chrm_rng = chromatogram.range
+          plot.title "mz:#{chrm_rng.begin},#{chrm_rng.end} Idx:#{chrom_index} W:#{opt.sg_window_points} O:#{opt.sg_order}"
+
+          plot.data << Gnuplot::DataSet.new( [chromatogram.retention_times, chromatogram.intensities] ) do |ds|
+            ds.title = "original"
+            ds.with = "linespoints"
+          end
+
+          plot.data << Gnuplot::DataSet.new( [new_time_vals, smoothed_intensities] ) do |ds|
+            ds.title = "smoothed and interpolated"
+            ds.with = "linespoints"
+          end
+        end
+      end
+    end
+  end
+end

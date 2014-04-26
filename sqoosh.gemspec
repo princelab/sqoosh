@@ -22,6 +22,7 @@ Gem::Specification.new do |spec|
     ["mspire", "~> 0.10.7.1"],
     ["andand", "~> 1.3.3"],
     ["binneroc", "~> 0.0.2"],
+    ["savgol", "~> 0.3.0"],
   ].each do |args|
     spec.add_dependency(*args)
   end
