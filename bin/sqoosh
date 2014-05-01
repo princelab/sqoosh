@@ -30,6 +30,7 @@ parser = OptionParser.new do |op|
   op.on("-o", "--sg-order <Int>", Integer, "savgol polynomial order (def: #{opt.sg_order})") {|v| opt.sg_order = v }
   op.on("--plot-chromatograms <0,1,...>", "comma separated list of chromatograms to plot") {|v| opt.plot_chromatograms = v.split(',').map(&:to_i) }
   op.on("--cache", "writes (or uses) <file>.#{CACHE_EXT}") {|v| opt.cache = v }
+  op.on("-v", "--verbose", "talk about it") {|v| $VERBOSE = 5 }
 end
 parser.parse!
 
@@ -45,14 +46,17 @@ ARGV.each do |file|
     if opt.cache 
       cache_file = base + CACHE_EXT
       if File.exist?(cache_file)
+        putsv "loading cache file"
         Marshal.load(IO.read(cache_file))
       else
+        putsv "reading chromatograms"
         chromatograms = Sqoosh::Chromatogram.create_chromatograms(file, increment: opt.mz_bin)
+        putsv "writing chromatograms to #{cache_file}"
         File.write(cache_file, Marshal.dump(chromatograms))
         chromatograms
       end
     end
-  putsv "#{chromatograms.size} chromatograms"
+  putsv "Have #{chromatograms.size} chromatograms"
 
   last_time = chromatograms.first.retention_times.last
   rnd_last_time = last_time.ceil
@@ -62,7 +66,7 @@ ARGV.each do |file|
   new_time_vals = (opt.rt_view_start..opt.rt_view_end).step(opt.rt_bin).to_a
 
   if opt.plot_chromatograms 
-    p opt.plot_chromatograms 
+    putsv "selecting chromatograms to plot"
     chromatograms = chromatograms.values_at(*opt.plot_chromatograms)
   end
 
