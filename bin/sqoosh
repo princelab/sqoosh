@@ -56,6 +56,8 @@ ARGV.each do |file|
         File.write(cache_file, Marshal.dump(chromatograms))
         chromatograms
       end
+    else
+      Sqoosh::Chromatogram.create_chromatograms(file, increment: opt.mz_bin)
     end
   putsv "Have #{chromatograms.size} chromatograms"
 
@@ -101,6 +103,8 @@ ARGV.each do |file|
     if true
       Gnuplot.open do |gp|
         Gnuplot::Plot.new(gp) do |plot|
+          plot.terminal "svg"
+          plot.output "chrmtg.#{chrom_index}.svg"
 
           chrm_rng = chromatogram.range
           plot.title "mz:#{chrm_rng.begin},#{chrm_rng.end} Idx:#{chrom_index} W:#{opt.sg_window_points} O:#{opt.sg_order}"
